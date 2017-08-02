@@ -67,10 +67,7 @@ def initial_matchups(players):
         lineup.append((firstboy, firstgirl, secondboy, secondgirl))
 
     for fb,fg,sb,sg in lineup:
-        print('M{}F{} M{}F{}'.format(fb, fg, sb, sg))
-        
-    for fb,fg,sb,sg in lineup:
-        print('{} / {} vs {} / {}'.format(boy_name(fb), girl_name(fg), boy_name(sb), girl_name(sg)))
+        print('{} / {} (M{}F{}) vs {} / {} (M{}F{})'.format(boy_name(fb), girl_name(fg), fb, fg, boy_name(sb), girl_name(sg), sb, sg))
 
 
 def read_roster():
