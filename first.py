@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-import random, sys
+import fileinput, random, sys
+
+players = list()
 
 MAX_TRIES = 1000
 def acceptable(first, second, num_teams):
@@ -30,23 +32,54 @@ def pick_odd_numbers(num_teams):
         
     return first, second
 
+def boy_name(number):
+    global players
+    try:
+        return players[(number * 2) - 2]
+    except Exception:
+        return "BYE"
 
-def initial_matchups(num_teams):
+def girl_name(number):
+    global players
+    try:
+        return players[(number * 2) - 1]
+    except Exception:
+        return "BYE"
+
+def initial_matchups(players):
+    if len(players) % 4 != 0:
+        print('Need an even number of teams!  Currently there are {} players, no good.'.format(len(players)))
+        sys.exit(0)
+
+    num_teams = len(players) / 2
     print('{} teams.'.format(num_teams))
     if (num_teams % 2 == 1):
         num_teams = num_teams + 1
         print('We\'re going to pretend there are {} teams, OK?'.format(num_teams))
 
+    lineup = list()
+        
     first, second = pick_odd_numbers(num_teams)
     for firstboy in range(1, num_teams, 2):
         firstgirl = 1 + ((firstboy + first - 1) % num_teams)
         secondboy = 1 + ((firstboy + second - 1) % num_teams)
         secondgirl = 1 + ((firstboy + first + second - 1) % num_teams)
-        print('M{}F{} M{}F{}'.format(firstboy, firstgirl, secondboy, secondgirl))
-    
-            
+        lineup.append((firstboy, firstgirl, secondboy, secondgirl))
 
-if len(sys.argv) == 2:
-    initial_matchups(int(sys.argv[1]))
-else:
-    print('Not implemented yet!')
+    for fb,fg,sb,sg in lineup:
+        print('M{}F{} M{}F{}'.format(fb, fg, sb, sg))
+        
+    for fb,fg,sb,sg in lineup:
+        print('{} / {} vs {} / {}'.format(boy_name(fb), girl_name(fg), boy_name(sb), girl_name(sg)))
+
+
+def read_roster():
+    for line in fileinput.input():
+        players.append(line.strip())
+    return players
+
+
+players = read_roster()
+
+initial_matchups(players)
+
