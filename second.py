@@ -73,9 +73,9 @@ def read_results():
         losers.append(girl_index(girllose))
         games.append((boy_index(boywin), girl_index(girlwin), boy_index(boylose), girl_index(girllose)))
 
-    expect_equal(len(players)/4, len(games), 'Expected {} games but only got results for {}.')
-    expect_equal(len(players)/2, len(winners), 'Expected {} winners but only have {}.')
-    expect_equal(len(players)/2, len(losers), 'Expected {} losers but only have {}.')
+    expect_equal(len(players)/4, len(games), 'Expected {} games but got results for {}.')
+    expect_equal(len(players)/2, len(winners), 'Expected {} winners but have {}.')
+    expect_equal(len(players)/2, len(losers), 'Expected {} losers but have {}.')
     expect_equal(0, len(set(winners) & set(losers)), 'Expected {} players in both winners and losers, but have {}.')
 
 def show_round_one_results():
@@ -148,7 +148,7 @@ def pair_from_pool(pool, pool_name):
             working_pool.remove(boy_opponent)
             working_pool.remove(girl_opponent)
 
-        if len(working_pool) == 0:
+        if len(working_pool) < 4:
             # we found pairings that use everyone
             break
         else:
@@ -162,6 +162,8 @@ def pair_from_pool(pool, pool_name):
     if numstarts < MAX_TRIES:
         print('{} PAIRINGS:'.format(pool_name))
         show_pairings(lineup)
+        if len(working_pool) > 0:
+            print('BYEs: {}'.format(', '.join(['{} ({})'.format(name(x), dfi(x))  for x in working_pool])))
         return lineup
     else:
         print('Couldnt find anything')
@@ -175,3 +177,7 @@ show_round_one_results()
 pair_from_pool(winners, 'WINNERS')
 pair_from_pool(losers, 'LOSERS')
 
+# NEXT STEPS
+# take in results from additional rounds  (losers are simply kicked out after the first round)
+# so you make another file for the additional matches?
+# QA?
