@@ -8,6 +8,7 @@ losers = list()   # Index number of players still in losers bracket, indexes fro
 games = list()    # Quads of games that have been played.  Each quad has the four indexes of the players who played.
 
 MAX_TRIES = 1000
+RELAX_THRESHOLD = 5
 
 def name(index):
     global players
@@ -60,47 +61,79 @@ def expect_equal(a, b, complaint_template):
     if a != b:
         complain(complaint_template.format(a,b))
 
+def expect(condition, message):
+    if not condition:
+        complain(message)
 
 def read_results():
     '''Read and validate all results.
     Everyone plays once and only once.
     '''
+    first_round_matches = len(players) / 4
     for line in fileinput.input(sys.argv[2]):
         boywin, girlwin, boylose, girllose = read_result_line(line)
-        winners.append(boy_index(boywin))
-        winners.append(girl_index(girlwin))
-        losers.append(boy_index(boylose))
-        losers.append(girl_index(girllose))
         games.append((boy_index(boywin), girl_index(girlwin), boy_index(boylose), girl_index(girllose)))
+        
+        if fileinput.lineno() <= first_round_matches:
+            # one of the first round matches.  put players in the winner and loser pools accordingly
+            winners.append(boy_index(boywin))
+            winners.append(girl_index(girlwin))
+            losers.append(boy_index(boylose))
+            losers.append(girl_index(girllose))
 
-    expect_equal(len(players)/4, len(games), 'Expected {} games but got results for {}.')
-    expect_equal(len(players)/2, len(winners), 'Expected {} winners but have {}.')
-    expect_equal(len(players)/2, len(losers), 'Expected {} losers but have {}.')
-    expect_equal(0, len(set(winners) & set(losers)), 'Expected {} players in both winners and losers, but have {}.')
+        if fileinput.lineno() == first_round_matches:
+            # first round matches are done. lets check that things were done right
+            expect_equal(len(players)/4, len(games), 'Expected {} games but got results for {}.')
+            expect_equal(len(players)/2, len(winners), 'Expected {} winners but have {}.')
+            expect_equal(len(players)/2, len(losers), 'Expected {} losers but have {}.')
+            expect_equal(0, len(set(winners) & set(losers)), 'Expected {} players in both winners and losers, but have {}.')
+                
+        if fileinput.lineno() > first_round_matches:
+            # a match was played after the first round.
+            if boy_index(boywin) in winners:
+                expected_pool = winners
+            else:
+                expected_pool = losers
+                
+            expect(girl_index(girlwin) in expected_pool, 'Expected {} in same pool as her teammate {}'.format(name(girl_index(girlwin)), name(boy_index(boywin))))
+            expect(boy_index(boylose) in expected_pool, 'Expected {} in same pool as his opponent {}'.format(name(boy_index(boylose)), name(boy_index(boywin))))
+            expect(girl_index(girllose) in expected_pool, 'Expected {} in same pool as her opponent {} was'.format(name(girl_index(girllose)), name(boy_index(boywin))))
+            expected_pool.remove(boy_index(boylose))
+            expected_pool.remove(girl_index(girllose))
 
-def show_round_one_results():
-    print 'ROUND ONE RESULTS:'
+
+def show_results():
     for game in games:
         print('{} / {} ({}{}) defeated {} / {} ({}{})'.format(name(game[0]), name(game[1]), dfi(game[0]), dfi(game[1]), name(game[2]), name(game[3]), dfi(game[2]), dfi(game[3])))
 
-def played_before(a, b):
-    for game in games:
-        gameplayers = set(list(game))
+def played_before(a, b, try_number):
+    if try_number < RELAX_THRESHOLD:
+        # at first we look at all games
+        for game in games:
+            gameplayers = set(list(game))
+            if ((a in gameplayers) and (b in gameplayers)):
+                return True
+    elif try_number < 2 * RELAX_THRESHOLD:
+        # then we look only at the most recent game played by each person
+        latest_game = [g for g in games if a in set(list(g))][-1]
+        gameplayers = set(list(latest_game))
         if ((a in gameplayers) and (b in gameplayers)):
             return True
-    return False
+    else:
+        # then we dont care about past games
+        return False
         
-def pair_ok(boy, girl):
-    if number(boy) == number(girl):
+def pair_ok(boy, girl, try_number):
+    if number(boy) == number(girl) and try_number < 3 * RELAX_THRESHOLD:
         return False   # dont play with spouse
-    if played_before(boy, girl):
+    if played_before(boy, girl, try_number):
         return False   # dont play with or against anyone youve played with before
     return True
 
-def opponent_ok(a, b):
-    if number(a) == number(b):
+def opponent_ok(a, b, try_number):
+    if number(a) == number(b) and try_number < 3 * RELAX_THRESHOLD:
         return False   # dont play against spouse
-    if played_before(a, b):
+    if played_before(a, b, try_number + 2):
         return False   # dont play with or against anyone youve played with before
     return True
 
@@ -125,20 +158,21 @@ def pair_from_pool(pool, pool_name):
             girl_pool = [x for x in working_pool if x % 2 == 1]
 
             boy_player = random.choice(boy_pool)
-            eligible_girls = [x for x in girl_pool if pair_ok(boy_player, x)]
+            eligible_girls = [x for x in girl_pool if pair_ok(boy_player, x, numstarts)]
             if len(eligible_girls) == 0:
 #                print('ACK', len(lineup), lineup)
                 continue
             girl_player = random.choice(eligible_girls)
 
-            eligible_boy_opponents = [x for x in boy_pool if x != boy_player and opponent_ok(boy_player, x) and opponent_ok(girl_player, x)]
+            eligible_boy_opponents = [x for x in boy_pool if x != boy_player and opponent_ok(boy_player, x, numstarts) and opponent_ok(girl_player, x, numstarts)]
             if len(eligible_boy_opponents) == 0:
 #                print('NO WAY', len(lineup), lineup)
                 continue
             boy_opponent = random.choice(eligible_boy_opponents)
-            eligible_girl_opponents = [x for x in girl_pool if x != girl_player and opponent_ok(boy_player, x) and opponent_ok(girl_player, x) and pair_ok(boy_opponent, x)]
+            pool_girls = [x for x in girl_pool if x != girl_player]
+            eligible_girl_opponents = [x for x in pool_girls if x != girl_player and opponent_ok(boy_player, x, numstarts) and opponent_ok(girl_player, x, numstarts) and pair_ok(boy_opponent, x, numstarts)]
             if len(eligible_girl_opponents) == 0:
-#                print('UGGGGHHHH', len(lineup), lineup)
+#                print('UGGGGHHHH', len(lineup), lineup, dfi(boy_player), dfi(girl_player), dfi(boy_opponent), [dfi(x) for x in pool_girls])
                 continue
             girl_opponent = random.choice(eligible_girl_opponents)
 
@@ -173,11 +207,6 @@ def pair_from_pool(pool, pool_name):
 
 players = read_roster()
 read_results()
-show_round_one_results()
+show_results()
 pair_from_pool(winners, 'WINNERS')
 pair_from_pool(losers, 'LOSERS')
-
-# NEXT STEPS
-# take in results from additional rounds  (losers are simply kicked out after the first round)
-# so you make another file for the additional matches?
-# QA?
